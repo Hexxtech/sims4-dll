@@ -2,33 +2,33 @@ name: Build Windows DLL
 
 on:
   push:
-    branches: [master, main]
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: windows-2022
+
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup MSVC
-        uses: microsoft/setup-msbuild@v1.1
-      
-      - name: Download Detours
-        run: |
-          curl -L -o detours.zip https://github.com/microsoft/Detours/archive/refs/tags/v4.0.1.zip
-          tar -xf detours.zip
-          cd Detours-4.0.1/src
-          nmake
-      
-      - name: Compile DLL
-        shell: cmd
-        run: |
-          call "C:Program FilesMicrosoft Visual Studio2EnterpriseVCAuxiliaryBuild\u000Bcvars64.bat"
-          cl.exe /LD version.cpp /I"Detours-4.0.1include" /link Detours-4.0.1lib.X64detours.lib kernel32.lib user32.lib shell32.lib wininet.lib
-      
-      - name: Upload DLL
-        uses: actions/upload-artifact@v4
-        with:
-          name: version-dll
-          path: version.dll
+    - uses: actions/checkout@v4
+    
+    - name: Setup Visual Studio Environment
+      uses: ilammy/msvc-dev-cmd@v1
+    
+    - name: Download and Build Detours
+      run: |
+        curl -L -o detours.zip https://github.com/microsoft/Detours/archive/refs/tags/v4.0.1.zip
+        tar -xf detours.zip
+        cd Detours-4.0.1/src
+        nmake
+    
+    - name: Compile DLL
+      run: cl.exe /LD version.cpp /I"Detours-4.0.1/include" /link Detours-4.0.1/lib.X64/detours.lib kernel32.lib user32.lib shell32.lib wininet.lib
+    
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: version-dll
+        path: version.dll
