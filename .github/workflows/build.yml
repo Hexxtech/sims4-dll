@@ -1,4 +1,4 @@
-name: Build Windows DLL
+name: C/C++ CI
 
 on:
   push:
