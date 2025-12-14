@@ -24,7 +24,7 @@ jobs:
       - name: Compile DLL
         shell: cmd
         run: |
-          call "C:Program FilesMicrosoft Visual Studio2EnterpriseVCAuxiliaryBuild\u000Bcvars64.bat"
+          call "C:/Program Files/Microsoft Visual Studio/Enterprise/VC/AuxiliaryBuild\u000Bcvars64.bat"
           cl.exe /LD version.cpp /I"Detours-4.0.1include" /link Detours-4.0.1lib.X64detours.lib kernel32.lib user32.lib shell32.lib wininet.lib
       
       - name: Upload DLL
