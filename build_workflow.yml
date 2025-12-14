@@ -13,36 +13,34 @@ jobs:
     
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     
     - name: Setup MSVC
-      uses: microsoft/setup-msbuild@v1.1
+      uses: microsoft/setup-msbuild@v2
     
-    - name: Download Microsoft Detours
-      run: |
-        curl -L -o detours.zip https://github.com/microsoft/Detours/archive/refs/tags/v4.0.1.zip
-        Expand-Archive detours.zip -DestinationPath .
-        Rename-Item Detours-4.0.1 Detours
-      shell: powershell
-    
-    - name: Build Detours
-      run: |
-        cd Detours/src
-        nmake
-      shell: cmd
-    
-    - name: Build version.dll
-      run: |
-        cl.exe /LD version.cpp /DEF:version.def /EHsc ^
-          /I"Detours/include" ^
-          /link Detours/lib.X64/detours.lib kernel32.lib user32.lib shell32.lib wininet.lib version.lib
-      shell: cmd
-    
-    - name: Upload artifact
-      uses: actions/upload-artifact@v3
+    - name: Setup Developer Command Prompt
+      uses: ilammy/msvc-dev-cmd@v1
       with:
-        name: version-dll
+        arch: x64
+    
+    - name: Download and Build Detours
+      shell: powershell
+      run: |
+        Invoke-WebRequest -Uri "https://github.com/microsoft/Detours/archive/refs/tags/v4.0.1.zip" -OutFile "detours.zip"
+        Expand-Archive -Path "detours.zip" -DestinationPath "."
+        cd Detours-4.0.1/src
+        nmake
+        cd ../..
+    
+    - name: Compile DLL
+      shell: cmd
+      run: |
+        cl.exe /LD version.cpp /DEF:version.def /EHsc /I"Detours-4.0.1/include" /link Detours-4.0.1/lib.X64/detours.lib kernel32.lib user32.lib shell32.lib wininet.lib version.lib
+    
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: version-dll-x64
         path: |
           version.dll
           version.lib
-          version.exp
