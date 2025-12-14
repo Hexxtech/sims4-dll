@@ -2,8 +2,8 @@ name: Build Windows DLL
 
 on:
   push:
-    branches: [ master, main ]
-  workflow_dispatch:  # This allows manual triggering!
+    branches: [master, main]
+  workflow_dispatch:
 
 jobs:
   build:
