@@ -25,7 +25,7 @@ jobs:
         nmake
     
     - name: Compile DLL
-      run: cl.exe /LD version.cpp /I"Detours-4.0.1/include" /link Detours-4.0.1/lib.X64/detours.lib kernel32.lib user32.lib shell32.lib wininet.lib
+      run: cl.exe /LD version.cpp /DEF:version.def /I"Detours-4.0.1/include" /link Detours-4.0.1/lib.X64/detours.lib kernel32.lib user32.lib shell32.lib wininet.lib
     
     - name: Upload Artifact
       uses: actions/upload-artifact@v4

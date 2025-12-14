@@ -1,8 +1,8 @@
 LIBRARY version.dll
 EXPORTS
-    GetFileVersionInfoA
-    GetFileVersionInfoW
-    GetFileVersionInfoSizeA
-    GetFileVersionInfoSizeW
-    VerQueryValueA=MyVerQueryValueA
-    VerQueryValueW=MyVerQueryValueW
+    GetFileVersionInfoA=Proxy_GetFileVersionInfoA @1
+    GetFileVersionInfoW=Proxy_GetFileVersionInfoW @2
+    GetFileVersionInfoSizeA=Proxy_GetFileVersionInfoSizeA @3
+    GetFileVersionInfoSizeW=Proxy_GetFileVersionInfoSizeW @4
+    VerQueryValueA=Proxy_VerQueryValueA @5
+    VerQueryValueW=Proxy_VerQueryValueW @6

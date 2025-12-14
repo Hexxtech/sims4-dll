@@ -1,13 +1,10 @@
 #include <windows.h>
 #include <wininet.h>
-#include <string>
-#include <vector>
 
 #pragma comment(lib, "wininet.lib")
 
 static HMODULE hOriginalDll = NULL;
 
-// Forward declarations for original functions
 typedef BOOL (WINAPI *PFN_GetFileVersionInfoA)(LPCSTR, DWORD, DWORD, LPVOID);
 typedef BOOL (WINAPI *PFN_GetFileVersionInfoW)(LPCWSTR, DWORD, DWORD, LPVOID);
 typedef DWORD (WINAPI *PFN_GetFileVersionInfoSizeA)(LPCSTR, LPDWORD);
@@ -39,7 +36,7 @@ void DownloadDLCConfig() {
             DWORD bytesRead;
             
             while (InternetReadFile(hUrl, buffer, sizeof(buffer), &bytesRead) && bytesRead > 0) {
-                // Process DLC config here
+                // Process DLC config
             }
             
             InternetCloseHandle(hUrl);
@@ -52,7 +49,6 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved) {
     if (reason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(hModule);
         
-        // Load original version.dll
         char sysPath[MAX_PATH];
         GetSystemDirectoryA(sysPath, MAX_PATH);
         strcat_s(sysPath, "\\version.dll");
@@ -67,7 +63,6 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved) {
             pVerQueryValueW = (PFN_VerQueryValueW)GetProcAddress(hOriginalDll, "VerQueryValueW");
         }
         
-        // Download DLC config
         DownloadDLCConfig();
     }
     else if (reason == DLL_PROCESS_DETACH) {
@@ -78,29 +73,28 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID lpReserved) {
     return TRUE;
 }
 
-// Export functions
 extern "C" {
-    __declspec(dllexport) BOOL WINAPI GetFileVersionInfoA(LPCSTR f, DWORD h, DWORD l, LPVOID d) {
+    __declspec(dllexport) BOOL WINAPI Proxy_GetFileVersionInfoA(LPCSTR f, DWORD h, DWORD l, LPVOID d) {
         return pGetFileVersionInfoA ? pGetFileVersionInfoA(f, h, l, d) : FALSE;
     }
     
-    __declspec(dllexport) BOOL WINAPI GetFileVersionInfoW(LPCWSTR f, DWORD h, DWORD l, LPVOID d) {
+    __declspec(dllexport) BOOL WINAPI Proxy_GetFileVersionInfoW(LPCWSTR f, DWORD h, DWORD l, LPVOID d) {
         return pGetFileVersionInfoW ? pGetFileVersionInfoW(f, h, l, d) : FALSE;
     }
     
-    __declspec(dllexport) DWORD WINAPI GetFileVersionInfoSizeA(LPCSTR f, LPDWORD h) {
+    __declspec(dllexport) DWORD WINAPI Proxy_GetFileVersionInfoSizeA(LPCSTR f, LPDWORD h) {
         return pGetFileVersionInfoSizeA ? pGetFileVersionInfoSizeA(f, h) : 0;
     }
     
-    __declspec(dllexport) DWORD WINAPI GetFileVersionInfoSizeW(LPCWSTR f, LPDWORD h) {
+    __declspec(dllexport) DWORD WINAPI Proxy_GetFileVersionInfoSizeW(LPCWSTR f, LPDWORD h) {
         return pGetFileVersionInfoSizeW ? pGetFileVersionInfoSizeW(f, h) : 0;
     }
     
-    __declspec(dllexport) BOOL WINAPI MyVerQueryValueA(LPCVOID b, LPCSTR s, LPVOID* l, PUINT u) {
+    __declspec(dllexport) BOOL WINAPI Proxy_VerQueryValueA(LPCVOID b, LPCSTR s, LPVOID* l, PUINT u) {
         return pVerQueryValueA ? pVerQueryValueA(b, s, l, u) : FALSE;
     }
     
-    __declspec(dllexport) BOOL WINAPI MyVerQueryValueW(LPCVOID b, LPCWSTR s, LPVOID* l, PUINT u) {
+    __declspec(dllexport) BOOL WINAPI Proxy_VerQueryValueW(LPCVOID b, LPCWSTR s, LPVOID* l, PUINT u) {
         return pVerQueryValueW ? pVerQueryValueW(b, s, l, u) : FALSE;
     }
 }
