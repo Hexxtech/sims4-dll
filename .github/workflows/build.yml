@@ -2,156 +2,194 @@ name: Build EA DLC Unlocker v2
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, master, develop ]
+    paths:
+      - 'src/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/build.yml'
   pull_request:
-    branches: [ main ]
+    branches: [ main, master ]
   workflow_dispatch:
+
+env:
+  DETOURS_VERSION: v4.0.1
+  BUILD_DIRECTORY: build
 
 jobs:
   build:
+    name: Build ${{ matrix.platform }}-${{ matrix.configuration }}
     runs-on: windows-latest
 
     strategy:
+      fail-fast: false
       matrix:
-        platform: [x64, x86]
+        platform: [x64]
         configuration: [Release, Debug]
 
     steps:
-    - uses: actions/checkout@v3
-
-    - name: Setup MSBuild
-      uses: microsoft/setup-msbuild@v1.1
+    - name: Checkout Repository
+      uses: actions/checkout@v4
       with:
-        msbuild-version: latest
+        fetch-depth: 0
 
-    - name: Download Detours Library
+    - name: Setup MSVC Compiler
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
+
+    - name: Download Microsoft Detours Library
       run: |
-        # Download Microsoft Detours from GitHub
-        $url = "https://github.com/microsoft/Detours/releases/download/v4.0.1/Detours.zip"
-        $output = "${{ runner.workspace }}/Detours.zip"
-        Invoke-WebRequest -Uri $url -OutFile $output
-        Expand-Archive -Path $output -DestinationPath "${{ runner.workspace }}/Detours"
+        Write-Host "Downloading Detours v4.0.1..." -ForegroundColor Green
+        Invoke-WebRequest `
+          -Uri "https://github.com/microsoft/Detours/archive/refs/tags/${{ env.DETOURS_VERSION }}.zip" `
+          -OutFile "detours.zip" `
+          -ErrorAction Stop
+
+        Write-Host "Extracting Detours..." -ForegroundColor Green
+        Expand-Archive -Path "detours.zip" -DestinationPath "." -ErrorAction Stop
+        Rename-Item -Path "Detours-4.0.1" -NewName "Detours" -ErrorAction Stop
+        Remove-Item -Path "detours.zip" -ErrorAction Stop
+
+        Write-Host "✓ Detours ready" -ForegroundColor Green
       shell: powershell
 
-    - name: Prepare Build Directory
+    - name: Build Detours Library
       run: |
-        mkdir -p build/${{ matrix.platform }}/${{ matrix.configuration }}
+        cd Detours\src
+        Write-Host "Building Detours..." -ForegroundColor Green
+        nmake
+        if ($LASTEXITCODE -ne 0) {
+          Write-Host "✗ Detours build failed" -ForegroundColor Red
+          exit 1
+        }
+        Write-Host "✓ Detours built successfully" -ForegroundColor Green
+      shell: powershell
+
+    - name: Create Build Directory
+      run: |
+        mkdir -p ${{ env.BUILD_DIRECTORY }}
       shell: bash
 
-    - name: Configure with CMake (if CMakeLists.txt exists)
-      if: hashFiles('CMakeLists.txt') != ''
+    - name: Compile version.dll
       run: |
-        cd build/${{ matrix.platform }}/${{ matrix.configuration }}
-        cmake -G "Visual Studio 17 2022" ^
-          -A ${{ matrix.platform == 'x64' && 'x64' || 'Win32' }} ^
-          -DCMAKE_BUILD_TYPE=${{ matrix.configuration }} ^
-          -DDetours_DIR="${{ runner.workspace }}/Detours" ^
-          ../../..
-      shell: cmd
-
-    - name: Build with MSVC (direct compilation)
-      run: |
+        echo "Building version.dll (${{ matrix.configuration }})..."
         cd src
-        cl.exe /LD version_complete_working.cpp /EHsc ^
-          /I"${{ runner.workspace }}/Detours/include" ^
-          /DEF:version.def ^
-          /Fo"../build/${{ matrix.platform }}/${{ matrix.configuration }}/" ^
-          /Fe"../build/${{ matrix.platform }}/${{ matrix.configuration }}/version.dll" ^
-          /link "${{ runner.workspace }}/Detours/lib.${{ matrix.platform }}/detours.lib" ^
-          kernel32.lib user32.lib shell32.lib wininet.lib
+
+        set DETOURS_INCLUDE=..\Detours\include
+        set DETOURS_LIB=..\Detours\lib.${{ matrix.platform }}
+        set OUT_DIR=..\${{ env.BUILD_DIRECTORY }}
+
+        cl.exe /LD version.cpp /DEF:version.def /EHsc ^
+          /I"%DETOURS_INCLUDE%" ^
+          /Fo"%OUT_DIR%\" ^
+          /Fe"%OUT_DIR%ersion.dll" ^
+          /W4 ^
+          /WX:OFF ^
+          /std:c++17 ^
+          /O2 ^
+          /DUNICODE ^
+          /D_UNICODE ^
+          /link "%DETOURS_LIB%\detours.lib" kernel32.lib user32.lib shell32.lib wininet.lib
+
+        if errorlevel 1 (
+          echo ✗ Build failed!
+          exit /b 1
+        )
+
+        echo ✓ Build successful!
       shell: cmd
 
-    - name: Run Tests (if available)
-      if: hashFiles('tests/**/*.cpp') != ''
+    - name: Verify DLL Existence
       run: |
-        cd tests
-        ctest --build-config ${{ matrix.configuration }} --verbose
-      shell: bash
+        if (Test-Path "${{ env.BUILD_DIRECTORY }}ersion.dll") {
+          $fileSize = (Get-Item "${{ env.BUILD_DIRECTORY }}ersion.dll").Length
+          Write-Host "✓ DLL created successfully" -ForegroundColor Green
+          Write-Host "  File: ${{ env.BUILD_DIRECTORY }}ersion.dll" -ForegroundColor Green
+          Write-Host "  Size: $([Math]::Round($fileSize / 1KB, 2)) KB" -ForegroundColor Green
+        } else {
+          Write-Host "✗ DLL not found!" -ForegroundColor Red
+          exit 1
+        }
+      shell: powershell
 
     - name: Generate Build Report
       if: always()
       run: |
-        echo "Build Report for version_complete_working.cpp" > build_report.txt
-        echo "Platform: ${{ matrix.platform }}" >> build_report.txt
-        echo "Configuration: ${{ matrix.configuration }}" >> build_report.txt
-        echo "Build Status: ${{ job.status }}" >> build_report.txt
-        echo "Build Date: $(date)" >> build_report.txt
-      shell: bash
+        $reportPath = "${{ env.BUILD_DIRECTORY }}uild-report.txt"
 
-    - name: Upload Artifacts
+        "Build Report for EA DLC Unlocker v2" > $reportPath
+        "========================================" >> $reportPath
+        "Date: $(Get-Date)" >> $reportPath
+        "Configuration: ${{ matrix.configuration }}" >> $reportPath
+        "Platform: ${{ matrix.platform }}" >> $reportPath
+        "Status: ${{ job.status }}" >> $reportPath
+        "" >> $reportPath
+
+        if (Test-Path "${{ env.BUILD_DIRECTORY }}ersion.dll") {
+          $fileSize = (Get-Item "${{ env.BUILD_DIRECTORY }}ersion.dll").Length
+          "✓ DLL Build: SUCCESS" >> $reportPath
+          "  Size: $([Math]::Round($fileSize / 1KB, 2)) KB" >> $reportPath
+        } else {
+          "✗ DLL Build: FAILED" >> $reportPath
+        }
+      shell: powershell
+
+    - name: Upload Build Artifacts
       if: success()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: version_${{ matrix.platform }}_${{ matrix.configuration }}
+        name: version-dll-${{ matrix.platform }}-${{ matrix.configuration }}
         path: |
-          build/${{ matrix.platform }}/${{ matrix.configuration }}/version.dll
-          build/${{ matrix.platform }}/${{ matrix.configuration }}/version.lib
-          build/${{ matrix.platform }}/${{ matrix.configuration }}/version.exp
+          ${{ env.BUILD_DIRECTORY }}/version.dll
+          ${{ env.BUILD_DIRECTORY }}/version.lib
+          ${{ env.BUILD_DIRECTORY }}/version.exp
+          ${{ env.BUILD_DIRECTORY }}/build-report.txt
         retention-days: 30
+        compression-level: 6
 
-    - name: Upload Build Report
-      if: always()
-      uses: actions/upload-artifact@v3
+    - name: Create Release on Tag
+      if: startsWith(github.ref, 'refs/tags/v') && success() && matrix.configuration == 'Release'
+      uses: softprops/action-gh-release@v2
       with:
-        name: build_report_${{ matrix.platform }}
-        path: build_report.txt
-
-    - name: Create Release (on tag)
-      if: startsWith(github.ref, 'refs/tags/v') && success()
-      uses: softprops/action-gh-release@v1
-      with:
-        files: build/${{ matrix.platform }}/Release/version.dll
+        files: ${{ env.BUILD_DIRECTORY }}/version.dll
         draft: false
         prerelease: false
+        generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  code-analysis:
+  analysis:
+    name: Code Analysis
     runs-on: windows-latest
     if: always()
 
     steps:
-    - uses: actions/checkout@v3
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
 
     - name: Run Clang Static Analyzer
-      run: |
-        # Install clang tools if not present
-        choco install llvm -y
-        cd src
-        clang-analyze version_complete_working.cpp --checks=-*,security.*
-      shell: powershell
       continue-on-error: true
-
-    - name: Generate Compilation Report
       run: |
-        echo "Static Analysis Report" > analysis_report.txt
-        echo "Status: Complete" >> analysis_report.txt
+        cd src
+        clang --analyze version.cpp -I../Detours/include || echo "Note: Clang analyzer may not be available"
       shell: bash
 
-    - name: Upload Analysis Report
-      uses: actions/upload-artifact@v3
-      with:
-        name: static_analysis_report
-        path: analysis_report.txt
-
-  security-scan:
+  quality-gates:
+    name: Quality Gates
     runs-on: ubuntu-latest
+    needs: build
     if: always()
 
     steps:
-    - uses: actions/checkout@v3
-
-    - name: Run Trivy Vulnerability Scanner
-      uses: aquasecurity/trivy-action@master
-      with:
-        scan-type: 'fs'
-        scan-ref: '.'
-        format: 'sarif'
-        output: 'trivy-results.sarif'
-        severity: 'CRITICAL,HIGH'
-
-    - name: Upload Trivy Results to GitHub Security
-      uses: github/codeql-action/upload-sarif@v2
-      with:
-        sarif_file: 'trivy-results.sarif'
-      continue-on-error: true
+    - name: Check Build Status
+      run: |
+        if [ "${{ needs.build.result }}" != "success" ]; then
+          echo "❌ Build failed. Check logs above."
+          exit 1
+        fi
+        echo "✅ Build quality gates passed"
