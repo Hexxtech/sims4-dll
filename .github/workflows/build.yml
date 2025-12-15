@@ -1,7 +1,7 @@
 name: Build EA DLC Unlocker v2
 
 on:
-  push:
+  push: 
     branches: [ main, master, develop ]
     paths:
       - 'src/**'
@@ -11,18 +11,18 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
-env:
+env: 
   DETOURS_VERSION: v4.0.1
   BUILD_DIRECTORY: build
 
-jobs:
+jobs: 
   build:
     name: Build ${{ matrix.platform }}-${{ matrix.configuration }}
     runs-on: windows-latest
 
     strategy:
       fail-fast: false
-      matrix:
+      matrix: 
         platform: [x64]
         configuration: [Release, Debug]
 
@@ -32,7 +32,7 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Setup MSVC Compiler
+    - name:  Setup MSVC Compiler
       uses: ilammy/msvc-dev-cmd@v1
       with:
         arch: x64
@@ -82,9 +82,9 @@ jobs:
         cl.exe /LD version.cpp /DEF:version.def /EHsc ^
           /I"%DETOURS_INCLUDE%" ^
           /Fo"%OUT_DIR%\" ^
-          /Fe"%OUT_DIR%ersion.dll" ^
+          /Fe"%OUT_DIR%\version.dll" ^
           /W4 ^
-          /WX:OFF ^
+          /WX: OFF ^
           /std:c++17 ^
           /O2 ^
           /DUNICODE ^
@@ -92,19 +92,19 @@ jobs:
           /link "%DETOURS_LIB%\detours.lib" kernel32.lib user32.lib shell32.lib wininet.lib
 
         if errorlevel 1 (
-          echo ✗ Build failed!
+          echo ✗ Build failed! 
           exit /b 1
         )
 
-        echo ✓ Build successful!
+        echo ✓ Build successful! 
       shell: cmd
 
-    - name: Verify DLL Existence
+    - name:  Verify DLL Existence
       run: |
-        if (Test-Path "${{ env.BUILD_DIRECTORY }}ersion.dll") {
-          $fileSize = (Get-Item "${{ env.BUILD_DIRECTORY }}ersion.dll").Length
+        if (Test-Path "${{ env.BUILD_DIRECTORY }}\version.dll") {
+          $fileSize = (Get-Item "${{ env.BUILD_DIRECTORY }}\version.dll").Length
           Write-Host "✓ DLL created successfully" -ForegroundColor Green
-          Write-Host "  File: ${{ env.BUILD_DIRECTORY }}ersion.dll" -ForegroundColor Green
+          Write-Host "  File: ${{ env.BUILD_DIRECTORY }}\version.dll" -ForegroundColor Green
           Write-Host "  Size: $([Math]::Round($fileSize / 1KB, 2)) KB" -ForegroundColor Green
         } else {
           Write-Host "✗ DLL not found!" -ForegroundColor Red
@@ -115,7 +115,7 @@ jobs:
     - name: Generate Build Report
       if: always()
       run: |
-        $reportPath = "${{ env.BUILD_DIRECTORY }}uild-report.txt"
+        $reportPath = "${{ env.BUILD_DIRECTORY }}\build-report.txt"
 
         "Build Report for EA DLC Unlocker v2" > $reportPath
         "========================================" >> $reportPath
@@ -125,8 +125,8 @@ jobs:
         "Status: ${{ job.status }}" >> $reportPath
         "" >> $reportPath
 
-        if (Test-Path "${{ env.BUILD_DIRECTORY }}ersion.dll") {
-          $fileSize = (Get-Item "${{ env.BUILD_DIRECTORY }}ersion.dll").Length
+        if (Test-Path "${{ env.BUILD_DIRECTORY }}\version.dll") {
+          $fileSize = (Get-Item "${{ env.BUILD_DIRECTORY }}\version.dll").Length
           "✓ DLL Build: SUCCESS" >> $reportPath
           "  Size: $([Math]::Round($fileSize / 1KB, 2)) KB" >> $reportPath
         } else {
@@ -138,10 +138,10 @@ jobs:
       if: success()
       uses: actions/upload-artifact@v4
       with:
-        name: version-dll-${{ matrix.platform }}-${{ matrix.configuration }}
+        name:  version-dll-${{ matrix.platform }}-${{ matrix.configuration }}
         path: |
           ${{ env.BUILD_DIRECTORY }}/version.dll
-          ${{ env.BUILD_DIRECTORY }}/version.lib
+          ${{ env. BUILD_DIRECTORY }}/version.lib
           ${{ env.BUILD_DIRECTORY }}/version.exp
           ${{ env.BUILD_DIRECTORY }}/build-report.txt
         retention-days: 30
@@ -164,13 +164,13 @@ jobs:
     if: always()
 
     steps:
-    - name: Checkout Repository
+    - name:  Checkout Repository
       uses: actions/checkout@v4
 
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
       with:
-        arch: x64
+        arch:  x64
 
     - name: Run Clang Static Analyzer
       continue-on-error: true
@@ -189,7 +189,7 @@ jobs:
     - name: Check Build Status
       run: |
         if [ "${{ needs.build.result }}" != "success" ]; then
-          echo "❌ Build failed. Check logs above."
+          echo "❌ Build failed.  Check logs above."
           exit 1
         fi
         echo "✅ Build quality gates passed"
