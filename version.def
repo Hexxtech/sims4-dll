@@ -1,43 +1,19 @@
-;============================================================================
-; version.def - Module Definition File for EA DLC Unlocker v2
-;============================================================================
-; This file exports all version.dll functions to maintain compatibility
-; when the DLL is used as a proxy/wrapper.
-;
-; Usage:
-; cl.exe /LD version.cpp /DEF:version.def /EHsc ^
-;   /I"Detours-4.0.1/include" ^
-;   /link Detours-4.0.1/lib.X64/detours.lib kernel32.lib user32.lib ^
-;   shell32.lib wininet.lib version.lib
-;============================================================================
-
 LIBRARY version
 
 EXPORTS
-    ; Core version info functions
-    GetFileVersionInfoA         @1
-    GetFileVersionInfoW         @2
-    GetFileVersionInfoExA       @3
-    GetFileVersionInfoExW       @4
-    GetFileVersionInfoSizeA     @5
-    GetFileVersionInfoSizeW     @6
-    GetFileVersionInfoSizeExA   @7
-    GetFileVersionInfoSizeExW   @8
-    
-    ; Query functions
-    VerQueryValueA              @9
-    VerQueryValueW              @10
-    
-    ; File operations
-    VerFindFileA                @11
-    VerFindFileW                @12
-    VerInstallFileA             @13
-    VerInstallFileW             @14
-    
-    ; Language name
-    VerLanguageNameA            @15
-    VerLanguageNameW            @16
-    
-    ; Additional exports for full compatibility
-    VerQueryValueIndexA         @17
-    VerQueryValueIndexW         @18
+    GetFileVersionInfoA=C:\Windows\System32\version.GetFileVersionInfoA             @1
+    GetFileVersionInfoW=C:\Windows\System32\version.GetFileVersionInfoW             @2
+    GetFileVersionInfoSizeA=C:\Windows\System32\version.GetFileVersionInfoSizeA     @3
+    GetFileVersionInfoSizeW=C:\Windows\System32\version.GetFileVersionInfoSizeW     @4
+    VerQueryValueA=C:\Windows\System32\version.VerQueryValueA                       @5
+    VerQueryValueW=C:\Windows\System32\version.VerQueryValueW                       @6
+    GetFileVersionInfoSizeExA=C:\Windows\System32\version.GetFileVersionInfoSizeExA @7
+    GetFileVersionInfoSizeExW=C:\Windows\System32\version.GetFileVersionInfoSizeExW @8
+    GetFileVersionInfoExA=C:\Windows\System32\version.GetFileVersionInfoExA         @9
+    GetFileVersionInfoExW=C:\Windows\System32\version.GetFileVersionInfoExW         @10
+    VerFindFileA=C:\Windows\System32\version.VerFindFileA                           @11
+    VerFindFileW=C:\Windows\System32\version.VerFindFileW                           @12
+    VerInstallFileA=C:\Windows\System32\version.VerInstallFileA                     @13
+    VerInstallFileW=C:\Windows\System32\version.VerInstallFileW                     @14
+    VerLanguageNameA=C:\Windows\System32\version.VerLanguageNameA                   @15
+    VerLanguageNameW=C:\Windows\System32\version.VerLanguageNameW                   @16
