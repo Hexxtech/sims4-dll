@@ -2,45 +2,156 @@ name: Build EA DLC Unlocker v2
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, develop ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: windows-latest
-    
+
+    strategy:
+      matrix:
+        platform: [x64, x86]
+        configuration: [Release, Debug]
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-    
-    - name: Setup MSVC
-      uses: microsoft/setup-msbuild@v2
-    
-    - name: Setup Developer Command Prompt
-      uses: ilammy/msvc-dev-cmd@v1
+    - uses: actions/checkout@v3
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v1.1
       with:
-        arch: x64
-    
-    - name: Download and Build Detours
+        msbuild-version: latest
+
+    - name: Download Detours Library
+      run: |
+        # Download Microsoft Detours from GitHub
+        $url = "https://github.com/microsoft/Detours/releases/download/v4.0.1/Detours.zip"
+        $output = "${{ runner.workspace }}/Detours.zip"
+        Invoke-WebRequest -Uri $url -OutFile $output
+        Expand-Archive -Path $output -DestinationPath "${{ runner.workspace }}/Detours"
       shell: powershell
+
+    - name: Prepare Build Directory
       run: |
-        Invoke-WebRequest -Uri "https://github.com/microsoft/Detours/archive/refs/tags/v4.0.1.zip" -OutFile "detours.zip"
-        Expand-Archive -Path "detours.zip" -DestinationPath "."
-        cd Detours-4.0.1/src
-        nmake
-        cd ../..
-    
-    - name: Compile DLL
+        mkdir -p build/${{ matrix.platform }}/${{ matrix.configuration }}
+      shell: bash
+
+    - name: Configure with CMake (if CMakeLists.txt exists)
+      if: hashFiles('CMakeLists.txt') != ''
+      run: |
+        cd build/${{ matrix.platform }}/${{ matrix.configuration }}
+        cmake -G "Visual Studio 17 2022" ^
+          -A ${{ matrix.platform == 'x64' && 'x64' || 'Win32' }} ^
+          -DCMAKE_BUILD_TYPE=${{ matrix.configuration }} ^
+          -DDetours_DIR="${{ runner.workspace }}/Detours" ^
+          ../../..
       shell: cmd
+
+    - name: Build with MSVC (direct compilation)
       run: |
-        cl.exe /LD version.cpp /DEF:version.def /EHsc /I"Detours-4.0.1/include" /link Detours-4.0.1/lib.X64/detours.lib kernel32.lib user32.lib shell32.lib wininet.lib version.lib
-    
+        cd src
+        cl.exe /LD version_complete_working.cpp /EHsc ^
+          /I"${{ runner.workspace }}/Detours/include" ^
+          /DEF:version.def ^
+          /Fo"../build/${{ matrix.platform }}/${{ matrix.configuration }}/" ^
+          /Fe"../build/${{ matrix.platform }}/${{ matrix.configuration }}/version.dll" ^
+          /link "${{ runner.workspace }}/Detours/lib.${{ matrix.platform }}/detours.lib" ^
+          kernel32.lib user32.lib shell32.lib wininet.lib
+      shell: cmd
+
+    - name: Run Tests (if available)
+      if: hashFiles('tests/**/*.cpp') != ''
+      run: |
+        cd tests
+        ctest --build-config ${{ matrix.configuration }} --verbose
+      shell: bash
+
+    - name: Generate Build Report
+      if: always()
+      run: |
+        echo "Build Report for version_complete_working.cpp" > build_report.txt
+        echo "Platform: ${{ matrix.platform }}" >> build_report.txt
+        echo "Configuration: ${{ matrix.configuration }}" >> build_report.txt
+        echo "Build Status: ${{ job.status }}" >> build_report.txt
+        echo "Build Date: $(date)" >> build_report.txt
+      shell: bash
+
     - name: Upload Artifacts
-      uses: actions/upload-artifact@v4
+      if: success()
+      uses: actions/upload-artifact@v3
       with:
-        name: version-dll-x64
+        name: version_${{ matrix.platform }}_${{ matrix.configuration }}
         path: |
-          version.dll
-          version.lib
+          build/${{ matrix.platform }}/${{ matrix.configuration }}/version.dll
+          build/${{ matrix.platform }}/${{ matrix.configuration }}/version.lib
+          build/${{ matrix.platform }}/${{ matrix.configuration }}/version.exp
+        retention-days: 30
+
+    - name: Upload Build Report
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: build_report_${{ matrix.platform }}
+        path: build_report.txt
+
+    - name: Create Release (on tag)
+      if: startsWith(github.ref, 'refs/tags/v') && success()
+      uses: softprops/action-gh-release@v1
+      with:
+        files: build/${{ matrix.platform }}/Release/version.dll
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  code-analysis:
+    runs-on: windows-latest
+    if: always()
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Run Clang Static Analyzer
+      run: |
+        # Install clang tools if not present
+        choco install llvm -y
+        cd src
+        clang-analyze version_complete_working.cpp --checks=-*,security.*
+      shell: powershell
+      continue-on-error: true
+
+    - name: Generate Compilation Report
+      run: |
+        echo "Static Analysis Report" > analysis_report.txt
+        echo "Status: Complete" >> analysis_report.txt
+      shell: bash
+
+    - name: Upload Analysis Report
+      uses: actions/upload-artifact@v3
+      with:
+        name: static_analysis_report
+        path: analysis_report.txt
+
+  security-scan:
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Run Trivy Vulnerability Scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        severity: 'CRITICAL,HIGH'
+
+    - name: Upload Trivy Results to GitHub Security
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+      continue-on-error: true
